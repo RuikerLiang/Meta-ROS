@@ -17,3 +17,6 @@
 [submodule "perception/cserialport_wrapper/CSerialPort"]
 	path = perception/cserialport_wrapper/CSerialPort
 	url = https://github.com/itas109/CSerialPort.git
+[submodule "decomposition/Meta_Engineer_Arm"]
+	path = decomposition/Meta_Engineer_Arm
+	url = https://github.com/LunateElf/Meta_Engineer_Arm/
