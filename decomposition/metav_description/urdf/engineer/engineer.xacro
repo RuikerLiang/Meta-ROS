@@ -1,6 +1,20 @@
 <?xml version="1.0"?>
 <robot name="engineer" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+
+    <!--Arm Macro-->
+    <xacro:macro name="arm_joint_config" params="joint_name motor_model motor_id reduction offset">
+        <joint name="${joint_name}">
+            <param name="motor_model">${motor_model}</param>
+            <param name="motor_id">${motor_id}</param>
+            <param name="mechanical_reduction">${reduction}</param>
+            <param name="offset">${offset}</param>
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+    </xacro:macro>
+
     <xacro:arg name="is_simulation" default="true" />
 
     <link name="base_footprint">
@@ -13,6 +27,7 @@
         <child link="base_link" />
     </joint>
 
+    <!--Chassis-->
     <xacro:include filename="$(find metav_description)/urdf/engineer/engineer.chassis.xacro" />
     <xacro:if value="$(arg is_simulation)">
         <xacro:chassis roller_type="simple" />
@@ -20,6 +35,14 @@
     <xacro:unless value="$(arg is_simulation)">
         <xacro:chassis roller_type="none" />
     </xacro:unless>
+    
+    <!--Arm-->
+    <xacro:include filename="$(find urdf_export)/urdf/Robot.urdf" />
+    <joint name="arm_mount_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="l_Base001" />
+        <origin xyz="0.0 0.0 0.1" rpy="0 0 0" /> 
+    </joint>
 
     <xacro:unless value="$(arg is_simulation)">
         <ros2_control name="engineer_hardware_control" type="system">
@@ -45,8 +68,12 @@
             <xacro:wheel_transmission prefix="front_right" mechanical_reduction="20.0" motor_id="2" />
             <xacro:wheel_transmission prefix="back_left" mechanical_reduction="20.0" motor_id="3" />
             <xacro:wheel_transmission prefix="back_right" mechanical_reduction="20.0" motor_id="4" />
+
+            <xacro:arm_joint_config joint_name="l_Base001__to__l_Link006" motor_model="GM6020" motor_id="1" reduction="1.0" offset="0.0"/>
+
         </ros2_control>
     </xacro:if>
+
 
     <xacro:if value="$(arg is_simulation)">
         <xacro:include filename="$(find metav_description)/urdf/engineer/engineer.gazebo.xacro" />
