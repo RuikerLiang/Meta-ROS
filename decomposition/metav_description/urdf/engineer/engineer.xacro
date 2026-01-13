@@ -2,19 +2,6 @@
 <robot name="engineer" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
 
-    <!--Arm Macro-->
-    <xacro:macro name="arm_joint_config" params="joint_name motor_model motor_id reduction offset">
-        <joint name="${joint_name}">
-            <param name="motor_model">${motor_model}</param>
-            <param name="motor_id">${motor_id}</param>
-            <param name="mechanical_reduction">${reduction}</param>
-            <param name="offset">${offset}</param>
-            <command_interface name="position"/>
-            <state_interface name="position"/>
-            <state_interface name="velocity"/>
-        </joint>
-    </xacro:macro>
-
     <xacro:arg name="is_simulation" default="true" />
 
     <link name="base_footprint">
@@ -41,21 +28,79 @@
     <joint name="arm_mount_joint" type="fixed">
         <parent link="base_link" />
         <child link="l_Base001" />
+        <!-- Adjusted offset for arm mounting position -->
         <origin xyz="0.0 0.0 0.1" rpy="0 0 0" /> 
     </joint>
 
     <xacro:unless value="$(arg is_simulation)">
-        <ros2_control name="engineer_hardware_control" type="system">
+        
+        <!-- ================= Chassis Control (DJI) ================= -->
+        <ros2_control name="engineer_chassis_control" type="system">
             <hardware>
                 <plugin>meta_hardware/MetaRobotDjiMotorNetwork</plugin>
                 <param name="can_network_name">can1</param>
             </hardware>
-            <!-- Updated to match standard mecanum layout defined in chassis.xacro -->
-            <!-- TODO: Verify actual CAN IDs for the engineer robot -->
             <xacro:wheel_transmission prefix="front_left" mechanical_reduction="20.0" motor_id="1" />
             <xacro:wheel_transmission prefix="front_right" mechanical_reduction="20.0" motor_id="2" />
             <xacro:wheel_transmission prefix="back_left" mechanical_reduction="20.0" motor_id="3" />
             <xacro:wheel_transmission prefix="back_right" mechanical_reduction="20.0" motor_id="4" />
+        </ros2_control>
+
+        <!-- ================= Arm Control Block 1: Damiao Motors (CAN Bus) ================= -->
+        <!-- 适用于达妙电机 (DM4310, DM-J8009 等) -->
+        <ros2_control name="engineer_arm_dm_control" type="system">
+            <hardware>
+                <plugin>meta_hardware/MetaRobotDmMotorNetwork</plugin>
+                <!-- NOTE: Ensure correct CAN interface (can0 or can1) -->
+                <param name="can_network_name">can0</param> 
+                <param name="master_id">0</param>
+            </hardware>
+
+            <!-- Macro for easy Damiao Motor config -->
+            <xacro:macro name="dm_motor_config" params="joint_name motor_id motor_model">
+                <joint name="${joint_name}">
+                    <param name="motor_model">${motor_model}</param>
+                    <param name="motor_id">${motor_id}</param>
+                    <param name="control_mode">position</param>
+                    <param name="max_pos">12.5</param>
+                    <param name="max_vel">10.0</param>
+                    <param name="max_effort">10.0</param>
+                    <param name="Kp">10.0</param>
+                    <param name="Kd">1.0</param>
+                    <command_interface name="position"/>
+                    <state_interface name="position"/>
+                    <state_interface name="velocity"/>
+                    <state_interface name="effort"/>
+                </joint>
+            </xacro:macro>
+            <xacro:dm_motor_config joint_name="l_Base001__to__l_Link006" motor_id="1" motor_model="DM4310" />
+            <xacro:dm_motor_config joint_name="l_Link007__to__l_Link008" motor_id="2" motor_model="DM-J8009" />
+            <xacro:dm_motor_config joint_name="l_Link009__to__l_Link010" motor_id="3" motor_model="DM-J4310" />
+
+        </ros2_control>
+
+        <!-- ================= Arm Control Block 2: Unitree Motors (Serial Bus) ================= -->
+        <ros2_control name="engineer_arm_unitree_control" type="system">
+            <hardware>
+                <plugin>meta_hardware/MetaRobotUnitreeMotorNetwork</plugin>
+                <param name="tty_devpath">/dev/ttyUSB0</param>
+            </hardware>
+            
+            <xacro:macro name="unitree_motor_config" params="joint_name motor_id motor_model">
+                <joint name="${joint_name}">
+                    <param name="motor_model">${motor_model}</param>
+                    <param name="motor_id">${motor_id}</param> 
+                    <command_interface name="position"/>
+                    <state_interface name="position"/>
+                    <state_interface name="velocity"/>
+                </joint>
+            </xacro:macro>
+
+            <xacro:unitree_motor_config joint_name="l_Link006__to__l_Link007" motor_id="1" motor_model="GO_M8010_6" /> 
+            <xacro:unitree_motor_config joint_name="l_Link008__to__l_Link009" motor_id="2" motor_model="GO_M8010_6" /> 
+            <xacro:unitree_motor_config joint_name="l_Link010__to__l_Link011" motor_id="3" motor_model="GO_M8010_6" />
+            <xacro:unitree_motor_config joint_name="l_Link011__to__l_Claw001" motor_id="4" motor_model="GO_M8010_6" />
+
         </ros2_control>
     </xacro:unless>
 
@@ -64,16 +109,31 @@
             <hardware>
                 <plugin>ign_ros2_control/IgnitionSystem</plugin>
             </hardware>
+            <!-- Chassis Sim -->
             <xacro:wheel_transmission prefix="front_left" mechanical_reduction="20.0" motor_id="1" />
             <xacro:wheel_transmission prefix="front_right" mechanical_reduction="20.0" motor_id="2" />
             <xacro:wheel_transmission prefix="back_left" mechanical_reduction="20.0" motor_id="3" />
             <xacro:wheel_transmission prefix="back_right" mechanical_reduction="20.0" motor_id="4" />
 
-            <xacro:arm_joint_config joint_name="l_Base001__to__l_Link006" motor_model="GM6020" motor_id="1" reduction="1.0" offset="0.0"/>
+            <!-- Arm Sim (Generic Interfaces) -->
+            <xacro:macro name="sim_arm_joint" params="joint_name">
+                <joint name="${joint_name}">
+                    <command_interface name="position"/>
+                    <state_interface name="position"/>
+                    <state_interface name="velocity"/>
+                </joint>
+            </xacro:macro>
+
+            <xacro:sim_arm_joint joint_name="l_Base001__to__l_Link006" />
+            <xacro:sim_arm_joint joint_name="l_Link006__to__l_Link007" />
+            <xacro:sim_arm_joint joint_name="l_Link007__to__l_Link008" />
+            <xacro:sim_arm_joint joint_name="l_Link008__to__l_Link009" />
+            <xacro:sim_arm_joint joint_name="l_Link009__to__l_Link010" />
+            <xacro:sim_arm_joint joint_name="l_Link010__to__l_Link011" />
+            <xacro:sim_arm_joint joint_name="l_Link011__to__l_Claw001" />
 
         </ros2_control>
     </xacro:if>
-
 
     <xacro:if value="$(arg is_simulation)">
         <xacro:include filename="$(find metav_description)/urdf/engineer/engineer.gazebo.xacro" />
